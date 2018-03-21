@@ -5,7 +5,7 @@ import java.text.DecimalFormat
 
 import fi.liikennevirasto.digiroad2.{GeometryUtils, Point}
 import fi.liikennevirasto.digiroad2.asset.{BoundingRectangle, LinkGeomSource, SideCode}
-import fi.liikennevirasto.digiroad2.dao.Sequences
+import fi.liikennevirasto.digiroad2.dao.{Queries, Sequences}
 import fi.liikennevirasto.digiroad2.oracle.{MassQuery, OracleDatabase}
 import fi.liikennevirasto.digiroad2.util.Track
 import fi.liikennevirasto.viite.AddressConsistencyValidator.{AddressError, AddressErrorDetails}
@@ -441,6 +441,10 @@ object RoadAddressDAO {
     *
     */
 
+  def getNextRoadAddressId: Long = {
+    Queries.nextViitePrimaryKeyId.as[Long].first
+  }
+
   def create(roadAddresses: Iterable[RoadAddress], createdBy : Option[String] = None): Seq[Long] = {
 
     val lrmPositionPS = dynamicSession.prepareStatement("insert into lrm_position (ID, link_id, SIDE_CODE, start_measure, end_measure, adjusted_timestamp, link_source) values (?, ?, ?, ?, ?, ?, ?)")
@@ -516,7 +520,7 @@ object RoadAddressDAO {
     lrmPositionPS.addBatch()
   }
 
-  def update(roadAddress: RoadAddress, geometry: Option[Seq[Point]]) : Unit = {
+  def update(roadAddress: RoadAddress, geometry: Option[Seq[Point]] = None) : Unit = {
     if (geometry.isEmpty)
       updateWithoutGeometry(roadAddress)
     else {
