@@ -793,7 +793,7 @@ class ProjectService(roadAddressService: RoadAddressService, roadLinkService: Ro
     } else {
       withDynTransaction {
         val missingLinkIds = linkIds -- floating.keySet -- addresses.keySet -- projectLinks.keySet
-        RoadAddressDAO.getMissingRoadAddresses(missingLinkIds)
+        MissingAddressDAO.getMissingRoadAddresses(missingLinkIds)
       }
     }.groupBy(_.linkId)
     val fetchMissingRoadAddressEndTime = System.currentTimeMillis()

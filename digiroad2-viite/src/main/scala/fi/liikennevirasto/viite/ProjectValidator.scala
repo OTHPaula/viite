@@ -670,8 +670,8 @@ object ProjectValidator {
 
         val filteredProblems = possibleProblems.filter(pp => {
           if (pp.roadNumber == startRoad.roadNumber || pp.roadNumber == endRoad.roadNumber) {
-            val lastRoadAddress = RoadAddressDAO.fetchByRoadPart(pp.roadNumber, pp.roadPartNumber, fetchOnlyEnd = true)
-            lastRoadAddress.head.endAddrMValue == pp.endAddrMValue
+            val lastRoadAddress = RoadAddressDAO.fetchByRoadPart(pp.roadNumber, pp.roadPartNumber).maxBy(_.endAddrMValue)
+            lastRoadAddress.endAddrMValue == pp.endAddrMValue
           } else false
         })
 

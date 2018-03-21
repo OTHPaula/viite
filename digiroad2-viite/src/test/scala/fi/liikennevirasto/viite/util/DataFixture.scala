@@ -45,7 +45,7 @@ object DataFixture {
   private lazy val geometryFrozen: Boolean = dr2properties.getProperty("digiroad2.VVHRoadlink.frozen", "false").toBoolean
 
   private def loopRoadParts(roadNumber: Int) = {
-    var partNumberOpt = RoadAddressDAO.fetchNextRoadPartNumber(roadNumber, 0)
+    var partNumberOpt = RoadAddressDAO.fetchNextRoadPartNumber(roadNumber, Some(0))
     while (partNumberOpt.nonEmpty) {
       val partNumber = partNumberOpt.get
       val roads = RoadAddressDAO.fetchByRoadPart(roadNumber, partNumber, true)
@@ -61,16 +61,16 @@ object DataFixture {
         case ex: InvalidAddressDataException => println(s"!!! Road $roadNumber, part $partNumber contains invalid address data - part skipped !!!")
           ex.printStackTrace()
       }
-      partNumberOpt = RoadAddressDAO.fetchNextRoadPartNumber(roadNumber, partNumber)
+      partNumberOpt = RoadAddressDAO.fetchNextRoadPartNumber(roadNumber, Some(partNumber))
     }
   }
 
   def recalculate():Unit = {
     OracleDatabase.withDynTransaction {
-      var roadNumberOpt = RoadAddressDAO.fetchNextRoadNumber(0)
+      var roadNumberOpt = RoadAddressDAO.fetchNextRoadPartNumber(0)
       while (roadNumberOpt.nonEmpty) {
         loopRoadParts(roadNumberOpt.get)
-        roadNumberOpt = RoadAddressDAO.fetchNextRoadNumber(roadNumberOpt.get)
+        roadNumberOpt = RoadAddressDAO.fetchNextRoadPartNumber(roadNumberOpt.get)
       }
     }
   }
@@ -163,7 +163,7 @@ object DataFixture {
           if (list.size != currReplacement.size) {
             val (kept, removed) = list.partition(ra => currReplacement.exists(_.id == ra.id))
             val (created) = currReplacement.filterNot(ra => kept.exists(_.id == ra.id))
-            RoadAddressDAO.remove(removed)
+            RoadAddressDAO.expireById(removed.map(_.id).toSet)
             RoadAddressDAO.create(created, Some("Automatic_merged"))
           }
         }
@@ -275,7 +275,7 @@ object DataFixture {
     roads.par.foreach { road =>
       println("%d: Fetch road addresses for road #%d".format(road, road))
       OracleDatabase.withDynTransaction {
-        val roadAddressSeq = RoadAddressDAO.fetchByRoad(road)
+        val roadAddressSeq = RoadAddressDAO.fetchByRoad(road).toSeq
         // Floating addresses are ignored
         val linkIds = roadAddressSeq.map(_.linkId).toSet
         println("%d: %d address rows fetched on %d links".format(road, roadAddressSeq.size, linkIds.size))

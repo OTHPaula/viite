@@ -37,7 +37,7 @@ class ContinuityChecker(roadLinkService: RoadLinkService) {
   def checkRoad(roadNumber: Int) = {
     var current = Option(0)
     while (current.nonEmpty) {
-      current = RoadAddressDAO.fetchNextRoadPartNumber(roadNumber, current.get)
+      current = RoadAddressDAO.fetchNextRoadPartNumber(current.get, Some(roadNumber))
       current.foreach(partNumber => checkRoadPart(roadNumber, partNumber))
     }
   }
@@ -45,7 +45,7 @@ class ContinuityChecker(roadLinkService: RoadLinkService) {
   def checkRoadNetwork() = {
     var current = Option(0)
     while (current.nonEmpty) {
-      current = RoadAddressDAO.fetchNextRoadNumber(current.get)
+      current = RoadAddressDAO.fetchNextRoadPartNumber(current.get)
       current.foreach(checkRoad)
     }
   }
