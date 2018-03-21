@@ -230,7 +230,7 @@ class RoadAddressDAOSpec extends FunSuite with Matchers {
     runWithRollback {
       val addresses = RoadAddressDAO.fetchByRoadPart(5, 206)
       addresses.nonEmpty should be (true)
-      RoadAddressDAO.remove(addresses) should be (addresses.size)
+      RoadAddressDAO.expireById(addresses.map(_.id).toSet) should be (addresses.size)
       sql"""SELECT COUNT(*) FROM ROAD_ADDRESS WHERE ROAD_NUMBER = 5 AND ROAD_PART_NUMBER = 206 AND VALID_TO IS NULL""".as[Long].first should be (0L)
     }
   }
@@ -260,9 +260,11 @@ class RoadAddressDAOSpec extends FunSuite with Matchers {
 
     val beforeCallMethodDatetime = now()
     runWithRollback {
-      val linkIds: Set[Long] = Set(4147081)
-      RoadAddressDAO.expireRoadAddresses(linkIds)
-      val dbResult = sql"""select valid_to FROM road_address where lrm_position_id in (select id from lrm_position where link_id in(4147081))""".as[DateTime].list
+      val newId = RoadAddressDAO.getNextRoadAddressId
+      sqlu"""Insert into LRM_POSITION values (lrm_position_primary_key_seq.nextval,null,2,0,21.021, null,1111102483,1476392565000,to_timestamp('17.09.15 19:39:30','RR.MM.DD HH24:MI:SS,FF'),1)""".execute
+      sqlu"""Insert into ROAD_ADDRESS values ($newId,1010,1,0,5,627,648,lrm_position_primary_key_seq.currval,to_date('63.01.01','RR.MM.DD'),null,'tr',to_date('98.10.16','RR.MM.DD'),0,0,MDSYS.SDO_GEOMETRY(4002,3067,NULL,MDSYS.SDO_ELEM_INFO_ARRAY(1,2,1),MDSYS.SDO_ORDINATE_ARRAY(288781.428,6825565.909,0,0,288763.118,6825576.235,0,21)),null, 1, 4)""".execute
+      RoadAddressDAO.expireById(Set(newId))
+      val dbResult = sql"""select valid_to FROM road_address where id = $newId""".as[DateTime].list
       dbResult.size should be (1)
       dbResult.foreach{ date =>
         date.getMillis should be >= beforeCallMethodDatetime.getMillis

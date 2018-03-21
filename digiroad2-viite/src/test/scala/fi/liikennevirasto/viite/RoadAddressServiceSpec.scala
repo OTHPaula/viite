@@ -190,11 +190,11 @@ class RoadAddressServiceSpec extends FunSuite with Matchers{
                     Map("linkId" -> 1611605, "segmentId" -> 63298), 1, 3, 0, 0, 0, 0, 0, "", "", 0.0, 0.0, SideCode.Unknown,
                     None, None, Anomaly.None, 0)
 
-      RoadAddressDAO.createMissingRoadAddress(
+      MissingAddressDAO.createMissingRoadAddress(
       MissingRoadAddress(raLink.linkId, Some(raLink.startAddressM), Some(raLink.endAddressM), RoadType.PublicRoad,
         Some(raLink.roadNumber), Some(raLink.roadPartNumber), None, None, Anomaly.NoAddressGiven, geom))
 
-      RoadAddressDAO.getMissingRoadAddresses(Set(raLink.linkId)).foreach { mra =>
+      MissingAddressDAO.getMissingRoadAddresses(Set(raLink.linkId)).foreach { mra =>
         mra.geom should be(geom)
       }
     }
@@ -657,7 +657,7 @@ class RoadAddressServiceSpec extends FunSuite with Matchers{
     }
     val targetIds = Seq("500055834","500055835","500055830","500055829")
     val roadAddresses = runWithRollback {
-      targetIds.map(_.toLong).foreach(id => RoadAddressDAO.createMissingRoadAddress(id, 0L, 0L, 1))
+      targetIds.map(_.toLong).foreach(id => MissingAddressDAO.createMissingRoadAddress(id, 0L, 0L, 1))
       myService.getRoadAddressesAfterCalculation(Seq("3611217","3611218"), targetIds, User(0L, "foo", Configuration()))
     }
     roadAddresses.size should be >0
@@ -687,7 +687,7 @@ class RoadAddressServiceSpec extends FunSuite with Matchers{
           ra
       }
       RoadAddressDAO.create(roadAddressSeq)
-      RoadAddressDAO.createMissingRoadAddress(1392315, 0, 0, 2)
+      MissingAddressDAO.createMissingRoadAddress(1392315, 0, 0, 2)
       // pre-checks
       RoadAddressDAO.fetchByLinkId(Set(1392315L, 1392326L), true) should have size (3)
       val mapping = DefloatMapper.createAddressMap(sourceLinks, targetLinks)
