@@ -887,10 +887,10 @@ class ProjectService(roadAddressService: RoadAddressService, roadLinkService: Ro
     fetchProjectRoadLinks(projectId, boundingRectangle, roadNumberLimits, municipalities, everything, publicRoads, fetch)
   }
 
-  private def getProjectWithReservationChecks(projectId: Long, newRoadNumber: Long, newRoadPart: Long): RoadAddressProject = {
+  private def getProjectWithReservationChecks(projectId: Long, newRoadNumber: Long, newRoadPart: Long, linkStatus: LinkStatus): RoadAddressProject = {
     RoadAddressValidator.checkProjectExists(projectId)
     val project = ProjectDAO.getRoadAddressProjectById(projectId).get
-    RoadAddressValidator.checkAvailable(newRoadNumber, newRoadPart, project)
+    RoadAddressValidator.checkAvailable(newRoadNumber, newRoadPart, project, linkStatus)
     RoadAddressValidator.checkNotReserved(newRoadNumber, newRoadPart, project)
     project
   }
@@ -1007,8 +1007,8 @@ class ProjectService(roadAddressService: RoadAddressService, roadLinkService: Ro
       }
     }
 
-    def checkAndMakeReservation(projectLinks: Seq[ProjectLink]) = {
-      val project = getProjectWithReservationChecks(projectId, newRoadNumber, newRoadPartNumber)
+    def checkAndMakeReservation(projectLinks: Seq[ProjectLink], linkStatus: LinkStatus) = {
+      val project = getProjectWithReservationChecks(projectId, newRoadNumber, newRoadPartNumber, linkStatus)
       try {
           val (toReplace, road, part) = isCompletelyNewPart(projectLinks)
           if (toReplace) {
@@ -1065,7 +1065,7 @@ class ProjectService(roadAddressService: RoadAddressService, roadLinkService: Ro
                 throw new ProjectValidationException(ErrorMultipleRoadNumbersOrParts)
               }
               //TODO: Check that the numbering target road number + road part does not exist or is reserved to this project
-              checkAndMakeReservation(toUpdateLinks)
+              checkAndMakeReservation(toUpdateLinks, LinkStatus.Numbering)
               ProjectDAO.updateProjectLinkNumbering(projectId, toUpdateLinks.head.roadNumber, toUpdateLinks.head.roadPartNumber,
                 linkStatus, newRoadNumber, newRoadPartNumber, userName)
             } else {
@@ -1073,7 +1073,7 @@ class ProjectService(roadAddressService: RoadAddressService, roadLinkService: Ro
             }
 
           case LinkStatus.Transfer =>
-            checkAndMakeReservation(toUpdateLinks)
+            checkAndMakeReservation(toUpdateLinks, LinkStatus.Transfer)
             val updated = toUpdateLinks.map(l => {
               l.copy(roadNumber = newRoadNumber, roadPartNumber = newRoadPartNumber, track = Track.apply(newTrackCode),
                 status = linkStatus, calibrationPoints = (None, None), roadType = RoadType.apply(roadType.toInt))
@@ -1082,7 +1082,7 @@ class ProjectService(roadAddressService: RoadAddressService, roadLinkService: Ro
             ProjectDAO.updateProjectLinkRoadTypeDiscontinuity(Set(updated.maxBy(_.endAddrMValue).id), linkStatus, userName, roadType, Some(discontinuity))
 
           case LinkStatus.UnChanged =>
-            checkAndMakeReservation(toUpdateLinks)
+            checkAndMakeReservation(toUpdateLinks, LinkStatus.UnChanged)
             // Reset back to original values
             resetLinkValues(toUpdateLinks)
             updateRoadTypeDiscontinuity(toUpdateLinks.map(_.copy(roadType = RoadType.apply(roadType.toInt), status = linkStatus)))
@@ -1090,7 +1090,7 @@ class ProjectService(roadAddressService: RoadAddressService, roadLinkService: Ro
           case LinkStatus.New =>
             // Current logic allows only re adding new road addresses whithin same road/part group
             if (toUpdateLinks.groupBy(l => (l.roadNumber, l.roadPartNumber)).size == 1) {
-              checkAndMakeReservation(toUpdateLinks)
+              checkAndMakeReservation(toUpdateLinks, LinkStatus.New)
               updateRoadTypeDiscontinuity(toUpdateLinks.map(_.copy(roadType = RoadType.apply(roadType.toInt), roadNumber = newRoadNumber, roadPartNumber = newRoadPartNumber, track = Track.apply(newTrackCode))))
             } else {
               throw new RoadAddressException(s"Useamman kuin yhden tien/tieosan tallennus kerralla ei ole tuettu.")
