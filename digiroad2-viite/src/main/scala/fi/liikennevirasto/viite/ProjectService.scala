@@ -266,8 +266,9 @@ class ProjectService(roadAddressService: RoadAddressService, roadLinkService: Ro
   private def addNewLinksToProjectInTX(newLinks: Seq[ProjectLink], projectId: Long, user: String, firstLinkId: Long): Option[String] = {
     val newRoadNumber = newLinks.head.roadNumber
     val newRoadPartNumber = newLinks.head.roadPartNumber
+    val linkStatus = newLinks.head.status
     try {
-      val project = getProjectWithReservationChecks(projectId, newRoadNumber, newRoadPartNumber)
+      val project = getProjectWithReservationChecks(projectId, newRoadNumber, newRoadPartNumber, linkStatus)
 
         if (!project.isReserved(newRoadNumber, newRoadPartNumber))
           ProjectDAO.reserveRoadPart(project.id, newRoadNumber, newRoadPartNumber, project.modifiedBy)
