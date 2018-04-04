@@ -33,7 +33,7 @@ object RoadAddressValidator {
       if ((!areAdjacent || !areOverlapping) && moreUses) {
         throw new ProjectValidationException(RoadNotAvailableMessage.format(number, part, currentProject.startDate.toString(fmt)))
       }
-    } ç
+    }
 
     if (linkStatus.value != LinkStatus.New.value) {
       if (RoadAddressDAO.isNotAvailableForProject(number, part, currentProject.id)) {
