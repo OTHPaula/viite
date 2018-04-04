@@ -23,7 +23,7 @@ object RoadAddressValidator {
       val allProjectsId = RoadAddressDAO.fetchProjectIdsOfReservedRoads(number, part)
       //
       val moreUses = if (allProjectsId.isEmpty) {
-        false
+        true
       } else {
         val removed = allProjectsId.filterNot(api => {
           filteredLinks.map(_.projectId).contains(api)
