@@ -36,7 +36,10 @@ object RoadAddressValidator {
         val moreUses = if (allProjectsId.isEmpty) {
           true
         } else {
-          allProjectsId.diff(filteredLinks.map(_.projectId)).isEmpty
+          val removed = allProjectsId.filterNot(api => {
+            filteredLinks.map(_.projectId).contains(api)
+          })
+          removed.nonEmpty
         }
         //Are adjacent or there is an overlapping road address with the project link
         if ((!areAdjacent || !areOverlapping) && moreUses)
