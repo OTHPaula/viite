@@ -268,7 +268,7 @@ class ProjectService(roadAddressService: RoadAddressService, roadLinkService: Ro
     val newRoadPartNumber = newLinks.head.roadPartNumber
     val linkStatus = newLinks.head.status
     try {
-      val project = getProjectWithReservationChecks(projectId, newRoadNumber, newRoadPartNumber, linkStatus)
+      val project = getProjectWithReservationChecks(projectId, newRoadNumber, newRoadPartNumber, linkStatus, newLinks)
 
         if (!project.isReserved(newRoadNumber, newRoadPartNumber))
           ProjectDAO.reserveRoadPart(project.id, newRoadNumber, newRoadPartNumber, project.modifiedBy)
@@ -888,10 +888,10 @@ class ProjectService(roadAddressService: RoadAddressService, roadLinkService: Ro
     fetchProjectRoadLinks(projectId, boundingRectangle, roadNumberLimits, municipalities, everything, publicRoads, fetch)
   }
 
-  private def getProjectWithReservationChecks(projectId: Long, newRoadNumber: Long, newRoadPart: Long, linkStatus: LinkStatus): RoadAddressProject = {
+  private def getProjectWithReservationChecks(projectId: Long, newRoadNumber: Long, newRoadPart: Long, linkStatus: LinkStatus, projectLinks: Seq[ProjectLink]): RoadAddressProject = {
     RoadAddressValidator.checkProjectExists(projectId)
     val project = ProjectDAO.getRoadAddressProjectById(projectId).get
-    RoadAddressValidator.checkAvailable(newRoadNumber, newRoadPart, project, linkStatus)
+    RoadAddressValidator.checkAvailable(newRoadNumber, newRoadPart, project, linkStatus, projectLinks)
     RoadAddressValidator.checkNotReserved(newRoadNumber, newRoadPart, project)
     project
   }
@@ -1009,7 +1009,7 @@ class ProjectService(roadAddressService: RoadAddressService, roadLinkService: Ro
     }
 
     def checkAndMakeReservation(projectLinks: Seq[ProjectLink], linkStatus: LinkStatus) = {
-      val project = getProjectWithReservationChecks(projectId, newRoadNumber, newRoadPartNumber, linkStatus)
+      val project = getProjectWithReservationChecks(projectId, newRoadNumber, newRoadPartNumber, linkStatus, projectLinks)
       try {
           val (toReplace, road, part) = isCompletelyNewPart(projectLinks)
           if (toReplace) {
