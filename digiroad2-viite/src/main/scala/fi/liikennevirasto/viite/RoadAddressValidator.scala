@@ -2,11 +2,39 @@ package fi.liikennevirasto.viite
 
 import fi.liikennevirasto.digiroad2.GeometryUtils
 import fi.liikennevirasto.viite.dao._
-import org.joda.time.format.DateTimeFormat
+import org.joda.time.format.{DateTimeFormat, DateTimeFormatter}
 
 object RoadAddressValidator {
 
   def checkAvailable(number: Long, part: Long, currentProject: RoadAddressProject, linkStatus: LinkStatus, projectLinks: Seq[ProjectLink]): Unit = {
+    def checkPartOriginal(originalAddresses: List[RoadAddress], filteredLinks: Seq[ProjectLink], fmt: DateTimeFormatter): Unit = {
+
+      val areAdjacent = originalAddresses.exists(ora => {
+        filteredLinks.exists(fl => {
+          GeometryUtils.areAdjacent(ora.geometry, fl.geometry)
+        })
+      })
+      val areOverlapping = originalAddresses.exists(ra => {
+        filteredLinks.exists(fl => {
+          GeometryUtils.overlaps((ra.startMValue, ra.endMValue), (fl.startMValue, fl.endMValue))
+        })
+      })
+      //Fetch all used projectId's from
+      val allProjectsId = RoadAddressDAO.fetchProjectIdsOfReservedRoads(number, part)
+      //
+      val moreUses = if (allProjectsId.isEmpty) {
+        false
+      } else {
+        val removed = allProjectsId.filterNot(api => {
+          filteredLinks.map(_.projectId).contains(api)
+        })
+        removed.nonEmpty
+      }
+      if ((!areAdjacent || !areOverlapping) && moreUses) {
+        throw new ProjectValidationException(RoadNotAvailableMessage.format(number, part, currentProject.startDate.toString(fmt)))
+      }
+    } ç
+
     if (linkStatus.value != LinkStatus.New.value) {
       if (RoadAddressDAO.isNotAvailableForProject(number, part, currentProject.id)) {
         val fmt = DateTimeFormat.forPattern("dd.MM.yyyy")
@@ -20,33 +48,15 @@ object RoadAddressValidator {
           p.roadNumber == number && p.roadPartNumber == part && p.status.value == linkStatus.value
         }).sortBy(_.endAddrMValue)
         val originalAddresses = RoadAddressDAO.fetchByRoadPart(number, part)
-        val areAdjacent = originalAddresses.exists(ora => {
-          filteredLinks.exists(fl => {
-            GeometryUtils.areAdjacent(ora.geometry, fl.geometry)
-          })
+        val isAPartOfOriginals = originalAddresses.exists(oR => {
+          filteredLinks.exists(_.linkId == oR.linkId)
         })
-        val areOverlapping = originalAddresses.exists(ra => {
-          filteredLinks.exists(fl => {
-            GeometryUtils.overlaps((ra.startMValue, ra.endMValue), (fl.startMValue, fl.endMValue))
-          })
-        })
-        //Fetch all used projectId's from
-        val allProjectsId = RoadAddressDAO.fetchProjectIdsOfReservedRoads(number, part)
-        //
-        val moreUses = if (allProjectsId.isEmpty) {
-          true
-        } else {
-          val removed = allProjectsId.filterNot(api => {
-            filteredLinks.map(_.projectId).contains(api)
-          })
-          removed.nonEmpty
-        }
         //Are adjacent or there is an overlapping road address with the project link
-        if ((!areAdjacent || !areOverlapping) && moreUses)
+        if (!isAPartOfOriginals)
           throw new ProjectValidationException(RoadNotAvailableMessage.format(number, part, currentProject.startDate.toString(fmt)))
+        else checkPartOriginal(originalAddresses, filteredLinks, fmt)
       }
     }
-
   }
 
   def checkNotReserved(number: Long, part: Long, currentProject: RoadAddressProject): Unit = {
