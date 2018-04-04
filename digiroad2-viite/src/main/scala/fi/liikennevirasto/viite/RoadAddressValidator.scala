@@ -14,9 +14,22 @@ object RoadAddressValidator {
       }
     } else {
       if (RoadAddressDAO.isNotAvailableForProjectNew(number, part, currentProject.id)) {
+        val fmt = DateTimeFormat.forPattern("dd.MM.yyyy")
+        //We need to determine if the projectLinks are indeed adjacent to the original RoadAddress
         val filteredLinks = projectLinks.filter(p => {
           p.roadNumber == number && p.roadPartNumber == part && p.status.value == linkStatus.value
         }).sortBy(_.endAddrMValue)
+        val originalAddresses = RoadAddressDAO.fetchByRoadPart(number, part)
+        val areAdjacent = originalAddresses.exists(ora => {
+          filteredLinks.exists(fl => {
+            GeometryUtils.areAdjacent(ora.geometry, fl.geometry)
+          })
+        })
+        val areOverlapping = originalAddresses.exists(ra => {
+          filteredLinks.exists(fl => {
+            GeometryUtils.overlaps((ra.startMValue, ra.endMValue), (fl.startMValue, fl.endMValue))
+          })
+        })
         //Fetch all used projectId's from
         val allProjectsId = RoadAddressDAO.fetchProjectIdsOfReservedRoads(number, part)
         //
@@ -25,29 +38,9 @@ object RoadAddressValidator {
         } else {
           allProjectsId.diff(filteredLinks.map(_.projectId)).isEmpty
         }
-        val fmt = DateTimeFormat.forPattern("dd.MM.yyyy")
-        if (!moreUses) {
-          //We need to determine if the projectLinks are indeed adjacent to the original RoadAddress
-          val originalAddresses = RoadAddressDAO.fetchByRoadPart(number, part)
-          val areAdjacent = originalAddresses.exists(ora => {
-            filteredLinks.exists(fl => {
-              GeometryUtils.areAdjacent(ora.geometry, fl.geometry)
-            })
-          })
-
-          val areOverlapping = originalAddresses.exists(ra => {
-            filteredLinks.exists(fl => {
-              GeometryUtils.overlaps((ra.startMValue, ra.endMValue), (fl.startMValue, fl.endMValue))
-            })
-          })
-
-          //Are adjacent or there is an overlapping road address with the project link
-          if (!areAdjacent || !areOverlapping)
-            throw new ProjectValidationException(RoadNotAvailableMessage.format(number, part, currentProject.startDate.toString(fmt)))
-        }
-        else {
+        //Are adjacent or there is an overlapping road address with the project link
+        if ((!areAdjacent || !areOverlapping) && moreUses)
           throw new ProjectValidationException(RoadNotAvailableMessage.format(number, part, currentProject.startDate.toString(fmt)))
-        }
       }
     }
 
