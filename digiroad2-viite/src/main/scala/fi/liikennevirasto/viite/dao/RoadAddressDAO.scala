@@ -655,6 +655,16 @@ object RoadAddressDAO {
     Q.queryNA[Int](query).firstOption.nonEmpty
   }
 
+  def fetchProjectIdsOfReservedRoads(roadNumber: Long, roadPartNumber: Long): Seq[Long] = {
+    val query =
+      s"""
+         Select distinct reserved.project_Id
+         From Project_Reserved_Road_Part reserved inner join project pro on pro.id = reserved.project_id
+         Where reserved.road_number = $roadNumber And reserved.road_part_number = $roadPartNumber and pro.state in (1, 2, 3, 4, 6)
+       """
+    Q.queryNA[Long](query).list
+  }
+
   /**
     *
     * @param roadNumber roadNumber for roadparts we want to check
