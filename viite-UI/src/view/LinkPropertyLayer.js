@@ -56,7 +56,8 @@
 
     var directionMarkerLayer = new ol.layer.Vector({
       source: directionMarkerVector,
-      name: 'directionMarkerLayer'
+      name: 'directionMarkerLayer',
+      zIndex: RoadZIndex.DirectionMarker.value
     });
 
     var geometryChangedLayer = new ol.layer.Vector({
@@ -66,14 +67,13 @@
       },
       zIndex: RoadZIndex.GeometryChangedLayer.value
     });
-
     var calibrationPointLayer = new ol.layer.Vector({
       source: calibrationPointVector,
       name: 'calibrationPointLayer',
       zIndex: RoadZIndex.CalibrationPointLayer.value
     });
 
-    var greenRoadLayer = new ol.layer.Vector({
+     var greenRoadLayer = new ol.layer.Vector({
       source: greenRoadLayerVector,
       name: 'greenRoadLayer',
       zIndex: RoadZIndex.GreenLayer.value
@@ -155,7 +155,6 @@
     map.addLayer(suravageMarkerLayer);
     map.addLayer(directionMarkerLayer);
     map.addLayer(geometryChangedLayer);
-    map.addLayer(calibrationPointLayer);
     map.addLayer(indicatorLayer);
     map.addLayer(greenRoadLayer);
     map.addLayer(pickRoadsLayer);
@@ -163,13 +162,14 @@
     map.addLayer(suravageRoadLayer);
     map.addLayer(reservedRoadLayer);
     map.addLayer(historicRoadsLayer);
+    map.addLayer(calibrationPointLayer);
+
 
     floatingMarkerLayer.setVisible(true);
     anomalousMarkerLayer.setVisible(true);
     suravageMarkerLayer.setVisible(true);
     directionMarkerLayer.setVisible(true);
     geometryChangedLayer.setVisible(false);
-    calibrationPointLayer.setVisible(true);
     indicatorLayer.setVisible(true);
     greenRoadLayer.setVisible(true);
     pickRoadsLayer.setVisible(true);
@@ -177,6 +177,7 @@
     suravageRoadLayer.setVisible(true);
     reservedRoadLayer.setVisible(true);
     historicRoadsLayer.setVisible(true);
+    calibrationPointLayer.setVisible(true);
 
     var isAnomalousById = function(featureId){
       var anomalousMarkers = anomalousMarkerLayer.getSource().getFeatures();

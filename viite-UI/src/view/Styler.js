@@ -101,7 +101,7 @@
      * @param projectLinkStatus Optional project link status (only in project mode, undef otherwise)
      * @returns {number} The zIndex for the feature.
      */
-    var determineZIndex = function (roadLinkType, anomaly, roadLinkSource, projectLinkStatus) {
+    var determineZIndex = function (roadLinkType, anomaly, roadLinkSource) {
       var zIndex = 0;
       if (roadLinkSource === LINKSOURCE_SURAVAGE) {
         zIndex = 9;
