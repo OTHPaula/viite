@@ -99,11 +99,11 @@ case class ProjectLink(id: Long, roadNumber: Long, roadPartNumber: Long, track: 
   lazy val endPoint = if (sideCode == SideCode.AgainstDigitizing) geometry.head else geometry.last
   lazy val isSplit: Boolean = connectedLinkId.nonEmpty || connectedLinkId.contains(0L)
 
-  def copyWithGeometry(newGeometry: Seq[Point]) = {
+  def copyWithGeometry(newGeometry: Seq[Point]): ProjectLink = {
     this.copy(geometry = newGeometry)
   }
 
-  def addrAt(a: Double) = {
+  def addrAt(a: Double): Long = {
     val coefficient = (endAddrMValue - startAddrMValue) / (endMValue - startMValue)
     sideCode match {
       case SideCode.AgainstDigitizing =>
@@ -316,10 +316,9 @@ object ProjectDAO {
   }
 
   def createRoadAddressProject(roadAddressProject: RoadAddressProject): Unit = {
-    sqlu"""
-         insert into project (id, state, name, ely, created_by, created_date, start_date ,modified_by, modified_date, add_info)
-         values (${roadAddressProject.id}, ${roadAddressProject.status.value}, ${roadAddressProject.name}, null, ${roadAddressProject.createdBy}, sysdate, ${roadAddressProject.startDate}, '-' , sysdate, ${roadAddressProject.additionalInfo})
-         """.execute
+    val sql = s"insert into project (id, state, name, ely, created_by, created_date, start_date ,modified_by, modified_date, add_info) " +
+      s"values (${roadAddressProject.id}, ${roadAddressProject.status.value}, ${roadAddressProject.name}, null, ${roadAddressProject.createdBy}, sysdate, ${roadAddressProject.startDate}, '-' , sysdate, ${roadAddressProject.additionalInfo})"
+    Q.updateNA(sql).execute
   }
 
   def getElyFromProjectLinks(projectId:Long): Option[Long]= {
@@ -445,14 +444,13 @@ object ProjectDAO {
 
 
   def updateAddrMValues(projectLink: ProjectLink): Unit = {
-    sqlu"""update project_link set modified_date = sysdate, start_addr_m = ${projectLink.startAddrMValue}, end_addr_m = ${projectLink.endAddrMValue}, calibration_points = ${CalibrationCode.getFromAddress(projectLink).value} where id = ${projectLink.id}
-          """.execute
+    val sql = s"update project_link set modified_date = sysdate, start_addr_m = ${projectLink.startAddrMValue}, end_addr_m = ${projectLink.endAddrMValue}, calibration_points = ${CalibrationCode.getFromAddress(projectLink).value} where id = ${projectLink.id} "
+    Q.updateNA(sql).execute
   }
 
   def updateRoadAddressProject(roadAddressProject: RoadAddressProject): Unit = {
-    sqlu"""
-         update project set state = ${roadAddressProject.status.value}, name = ${roadAddressProject.name}, modified_by = '-' ,modified_date = sysdate, add_info=${roadAddressProject.additionalInfo}, start_date=${roadAddressProject.startDate}, ely = ${roadAddressProject.ely} where id = ${roadAddressProject.id}
-         """.execute
+    val sql = s"update project set state = ${roadAddressProject.status.value}, name = ${roadAddressProject.name}, modified_by = '-' ,modified_date = sysdate, add_info=${roadAddressProject.additionalInfo}, start_date=${roadAddressProject.startDate}, ely = ${roadAddressProject.ely} where id = ${roadAddressProject.id}"
+    Q.updateNA(sql).execute
   }
 
   /**
@@ -464,28 +462,24 @@ object ProjectDAO {
     * @param reservedRoadPart Road part to be removed
     */
   def removeReservedRoadPart(projectId: Long, reservedRoadPart: ReservedRoadPart): Unit = {
-    sqlu"""
-           DELETE FROM PROJECT_LINK WHERE PROJECT_ID = $projectId AND
-           (EXISTS (SELECT 1 FROM ROAD_ADDRESS RA WHERE RA.ID = ROAD_ADDRESS_ID AND
-           RA.ROAD_NUMBER = ${reservedRoadPart.roadNumber} AND RA.ROAD_PART_NUMBER = ${reservedRoadPart.roadPartNumber}))
-           OR (ROAD_NUMBER = ${reservedRoadPart.roadNumber} AND ROAD_PART_NUMBER = ${reservedRoadPart.roadPartNumber}
-           AND (STATUS = ${LinkStatus.New.value} OR STATUS = ${LinkStatus.Numbering.value}))
-           """.execute
-    sqlu"""
-         DELETE FROM PROJECT_RESERVED_ROAD_PART WHERE id = ${reservedRoadPart.id}
-         """.execute
+    val sql1 = s"DELETE FROM PROJECT_LINK WHERE PROJECT_ID = $projectId AND (EXISTS (SELECT 1 FROM ROAD_ADDRESS RA WHERE RA.ID = ROAD_ADDRESS_ID AND RA.ROAD_NUMBER = ${reservedRoadPart.roadNumber} AND " +
+      s"RA.ROAD_PART_NUMBER = ${reservedRoadPart.roadPartNumber})) OR (ROAD_NUMBER = ${reservedRoadPart.roadNumber} AND ROAD_PART_NUMBER = ${reservedRoadPart.roadPartNumber} " +
+      s"AND (STATUS = ${LinkStatus.New.value} OR STATUS = ${LinkStatus.Numbering.value}))"
+
+    val sql2 = s"DELETE FROM PROJECT_RESERVED_ROAD_PART WHERE id = ${reservedRoadPart.id}"
+
+    Q.updateNA(sql1).execute
+    Q.updateNA(sql2).execute
   }
 
   def removeReservedRoadPart(projectId: Long, roadNumber: Long, roadPartNumber: Long): Unit = {
-    sqlu"""
-         DELETE FROM PROJECT_RESERVED_ROAD_PART WHERE project_id = ${projectId} and road_number = ${roadNumber} and road_part_number = ${roadPartNumber}
-         """.execute
+    val sql = s"DELETE FROM PROJECT_RESERVED_ROAD_PART WHERE project_id = $projectId and road_number = $roadNumber and road_part_number = $roadPartNumber"
+    Q.updateNA(sql).execute
   }
 
   def removeReservedRoadPartsByProject(projectId: Long): Unit = {
-    sqlu"""
-         DELETE FROM PROJECT_RESERVED_ROAD_PART WHERE project_id = ${projectId}
-         """.execute
+    val sql = s"DELETE FROM PROJECT_RESERVED_ROAD_PART WHERE project_id = $projectId"
+    Q.updateNA(sql).execute
   }
 
   def getProjectEly(roadAddressProjectId: Long): Option[Long] = {
@@ -495,17 +489,16 @@ object ProjectDAO {
          FROM project
          WHERE id=$roadAddressProjectId
        """
-    Q.queryNA[Option[Long]](query).firstOption.getOrElse(None)
+    Q.queryNA[Option[Long]](query).firstOption.flatten
   }
 
   def updateProjectEly(roadAddressProjectId: Long, ely: Long): Unit = {
-    sqlu"""
-       update project set ely = $ely, modified_date = sysdate where id =  ${roadAddressProjectId}
-      """.execute
+    val sql = s"update project set ely = $ely, modified_date = sysdate where id = $roadAddressProjectId"
+    Q.updateNA(sql).execute
   }
 
   def getRoadAddressProjectById(projectId: Long): Option[RoadAddressProject] = {
-    val where = s""" where id =${projectId}"""
+    val where = s""" where id =$projectId"""
     val query =
       s"""SELECT id, state, name, created_by, created_date, start_date, modified_by, COALESCE(modified_date, created_date),
            add_info, ely, status_info, coord_x, coord_y, zoom
@@ -615,10 +608,9 @@ object ProjectDAO {
            add_info, status_info, ely, coord_x, coord_y, zoom
           FROM project $filter order by ely nulls first, name, id """
     Q.queryNA[(Long, Long, String, String, DateTime, DateTime, String, DateTime, String, Option[String], Option[Long], Double, Double, Int)](query).list.map {
-      case (id, state, name, createdBy, createdDate, start_date, modifiedBy, modifiedDate, addInfo, statusInfo, ely, coordX, coordY, zoom) => {
+      case (id, state, name, createdBy, createdDate, start_date, modifiedBy, modifiedDate, addInfo, statusInfo, ely, coordX, coordY, zoom) =>
         RoadAddressProject(id, ProjectState.apply(state), name, createdBy, createdDate, modifiedBy, start_date,
           modifiedDate, addInfo, fetchReservedRoadParts(id), statusInfo, ely, Some(ProjectCoordinates(coordX, coordY, zoom)))
-      }
     }
   }
 
@@ -633,7 +625,7 @@ object ProjectDAO {
   }
 
   def roadPartReservedByProject(roadNumber: Long, roadPart: Long, projectId: Long = 0, withProjectId: Boolean = false): Option[String] = {
-    val filter = if (withProjectId && projectId != 0) s" AND project_id != ${projectId} " else ""
+    val filter = if (withProjectId && projectId != 0) s" AND project_id != $projectId " else ""
     val query =
       s"""SELECT p.name
               FROM project p
@@ -725,28 +717,28 @@ object ProjectDAO {
     }
   }
 
-  def addRotatingTRProjectId(projectId: Long) = {
+  def addRotatingTRProjectId(projectId: Long): Unit = {
     Q.updateNA(s"UPDATE PROJECT SET TR_ID = VIITE_PROJECT_SEQ.nextval WHERE ID= $projectId").execute
   }
 
-  def removeRotatingTRProjectId(projectId: Long) = {
+  def removeRotatingTRProjectId(projectId: Long): Unit = {
     Q.updateNA(s"UPDATE PROJECT SET TR_ID = NULL WHERE ID= $projectId").execute
   }
 
-  def updateProjectStateInfo(stateInfo: String, projectId: Long) = {
+  def updateProjectStateInfo(stateInfo: String, projectId: Long): Unit = {
     Q.updateNA(s"UPDATE PROJECT SET STATUS_INFO = '$stateInfo' WHERE ID= $projectId").execute
   }
 
-  def updateProjectCoordinates(projectId: Long, coordinates: ProjectCoordinates) = {
+  def updateProjectCoordinates(projectId: Long, coordinates: ProjectCoordinates): Unit = {
     Q.updateNA(s"UPDATE PROJECT SET COORD_X = ${coordinates.x},COORD_Y = ${coordinates.y}, ZOOM = ${coordinates.zoom} WHERE ID= $projectId").execute
   }
 
-  def getRotatingTRProjectId(projectId: Long) = {
+  def getRotatingTRProjectId(projectId: Long): List[Long] = {
     Q.queryNA[Long](s"Select tr_id From Project WHERE Id=$projectId AND tr_id IS NOT NULL ").list
   }
 
 
-  def updateProjectLinkValues(projectId: Long, roadAddress: RoadAddress, updateGeom : Boolean = true) = {
+  def updateProjectLinkValues(projectId: Long, roadAddress: RoadAddress, updateGeom : Boolean = true): Unit = {
     val updateGeometry = if(updateGeom) s" ,GEOMETRY = '${toGeomString(roadAddress.geometry)}'" else s""
 
     val updateProjectLink = s"UPDATE PROJECT_LINK SET ROAD_NUMBER = ${roadAddress.roadNumber}, " +
@@ -824,10 +816,11 @@ object ProjectDAO {
   }
 
   def updateProjectStatus(projectID: Long, state: ProjectState) {
-    sqlu""" update project set state=${state.value} WHERE id=$projectID""".execute
+    val sql = s"update project set state=${state.value} WHERE id=$projectID"
+    Q.updateNA(sql).execute
   }
 
-  def getProjectsWithWaitingTRStatus(): List[Long] = {
+  def getProjectsWithWaitingTRStatus: List[Long] = {
     val query =
       s"""
          SELECT id
@@ -940,7 +933,7 @@ object ProjectDAO {
     listQuery(query)
   }
 
-  def toTimeStamp(dateTime: Option[DateTime]) = {
+  def toTimeStamp(dateTime: Option[DateTime]): Option[Timestamp] = {
     dateTime.map(dt => new Timestamp(dt.getMillis))
   }
 

@@ -2,12 +2,12 @@ package fi.liikennevirasto.viite
 
 import java.sql.SQLIntegrityConstraintViolationException
 
-import fi.liikennevirasto.digiroad2.{GeometryUtils, Point}
+import fi.liikennevirasto.digiroad2.GeometryUtils
 import fi.liikennevirasto.digiroad2.oracle.OracleDatabase
 import fi.liikennevirasto.viite.AddressConsistencyValidator.AddressError.{InconsistentTopology, OverlappingRoadAddresses}
 import fi.liikennevirasto.viite.dao._
 import org.joda.time.DateTime
-import org.slf4j.LoggerFactory
+import org.slf4j.{Logger, LoggerFactory}
 import slick.driver.JdbcDriver.backend.Database.dynamicSession
 
 
@@ -18,7 +18,7 @@ class RoadNetworkService {
 
   def withDynSession[T](f: => T): T = OracleDatabase.withDynSession(f)
 
-  val logger = LoggerFactory.getLogger(getClass)
+  val logger: Logger = LoggerFactory.getLogger(getClass)
 
   def checkRoadAddressNetwork(options: RoadCheckOptions): Unit = {
 
@@ -30,28 +30,25 @@ class RoadNetworkService {
     }
 
     def checkOverlapping(road1: RoadAddress, road2: RoadAddress)(sortedRows: Seq[RoadAddress]) = {
-      road1.endAddrMValue != road2.startAddrMValue && road1.track.value == road2.track.value &&
-        !sortedRows.exists(s => s.track != road1.track && s.startAddrMValue == road1.endAddrMValue) match {
-        case true => {
-          RoadNetworkDAO.addRoadNetworkError(road1.id, OverlappingRoadAddresses.value)
-        }
-        case _ => None
+      if (road1.endAddrMValue != road2.startAddrMValue && road1.track.value == road2.track.value &&
+        !sortedRows.exists(s => s.track != road1.track && s.startAddrMValue == road1.endAddrMValue)) {
+        RoadNetworkDAO.addRoadNetworkError(road1.id, OverlappingRoadAddresses.value)
+      } else {
+        None
       }
     }
 
     def checkTopology(road1: RoadAddress, road2: RoadAddress)(sortedRows: Seq[RoadAddress]) = {
-      (!GeometryUtils.areAdjacent(road1.geometry, road2.geometry, MaxDistanceForConnectedLinks) &&
+      if ((!GeometryUtils.areAdjacent(road1.geometry, road2.geometry, MaxDistanceForConnectedLinks) &&
         (road1.discontinuity != Discontinuity.MinorDiscontinuity && road1.discontinuity != Discontinuity.Discontinuous ||
           road2.discontinuity != Discontinuity.MinorDiscontinuity && road2.discontinuity != Discontinuity.Discontinuous) &&
         sortedRows.maxBy(_.endAddrMValue).endAddrMValue != road1.endAddrMValue &&
-          !sortedRows.exists(s => s.startAddrMValue == road1.endAddrMValue && s.track != road1.track &&
-            GeometryUtils.areAdjacent(road1.geometry, s.geometry, MaxDistanceForConnectedLinks))) ||
-        checkCalibrationPoints(road1, road2)
-      match {
-        case true => {
-          RoadNetworkDAO.addRoadNetworkError(road1.id, InconsistentTopology.value)
-        }
-        case _ => None
+        !sortedRows.exists(s => s.startAddrMValue == road1.endAddrMValue && s.track != road1.track &&
+          GeometryUtils.areAdjacent(road1.geometry, s.geometry, MaxDistanceForConnectedLinks))) ||
+        checkCalibrationPoints(road1, road2)) {
+        RoadNetworkDAO.addRoadNetworkError(road1.id, InconsistentTopology.value)
+      } else {
+        None
       }
     }
 
@@ -82,11 +79,10 @@ class RoadNetworkService {
         ExportLockDAO.delete
       } catch {
         case e: SQLIntegrityConstraintViolationException => logger.info("A road network check is already running")
-        case _: Exception => {
+        case _: Exception =>
           logger.error("Error during road address network check")
           dynamicSession.rollback()
           ExportLockDAO.delete
-        }
       }
     }
   }

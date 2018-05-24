@@ -6,7 +6,7 @@ import fi.liikennevirasto.viite.dao.{ProjectLinkNameDAO, RoadName, RoadNameDAO}
 import org.joda.time.DateTime
 import org.slf4j.LoggerFactory
 import scala.util.control.NonFatal
-import org.joda.time.format.DateTimeFormat
+import org.joda.time.format.{DateTimeFormat, DateTimeFormatter}
 
 case class RoadNameRow(id: Long, name: String, startDate: String, endDate: Option[String])
 
@@ -18,7 +18,7 @@ class RoadNameService() {
 
   private val logger = LoggerFactory.getLogger(getClass)
 
-  val formatter = DateTimeFormat.forPattern("dd.MM.yyyy")
+  val formatter: DateTimeFormatter = DateTimeFormat.forPattern("dd.MM.yyyy")
 
   def getRoadNames(oRoadNumber: Option[String], oRoadName: Option[String], oStartDate: Option[DateTime], oEndDate: Option[DateTime]): Either[String, Seq[RoadName]] = {
     withDynTransaction {

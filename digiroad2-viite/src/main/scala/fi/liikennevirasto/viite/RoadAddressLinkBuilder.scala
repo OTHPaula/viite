@@ -120,13 +120,15 @@ object RoadAddressLinkBuilder extends AddressLinkBuilder {
       case Some(road) => road.sideCode
       case _ => SideCode.Unknown
     }
-    val startAddrM = roadAddresses.nonEmpty match {
-      case true => roadAddresses.map(_.startAddrMValue).min
-      case false => 0L
+    val startAddrM = if (roadAddresses.nonEmpty) {
+      roadAddresses.map(_.startAddrMValue).min
+    } else {
+      0L
     }
-    val endAddrM = roadAddresses.nonEmpty match {
-      case true => roadAddresses.map(_.endAddrMValue).max
-      case false => 0L
+    val endAddrM = if (roadAddresses.nonEmpty) {
+      roadAddresses.map(_.endAddrMValue).max
+    } else {
+      0L
     }
 
     val roadLinkRoadNumber = toLongNumber(headAddress.map(_.roadNumber), roadLink.attributes.get(RoadNumber))
@@ -203,7 +205,7 @@ object RoadAddressLinkBuilder extends AddressLinkBuilder {
   }
 
   def dropShort(geomLength: Double, sourceSegments: Seq[RoadAddressLink]): Seq[RoadAddressLink] = {
-    if (sourceSegments.size < 2)
+    if (sourceSegments.lengthCompare(2) < 0)
       return sourceSegments
     val passThroughSegments = sourceSegments.partition(s => s.length >= MinAllowedRoadAddressLength)._1
     passThroughSegments
@@ -234,43 +236,43 @@ object RoadType {
   }
 
   case object PublicRoad extends RoadType {
-    def value = 1;
+    def value = 1
 
     def displayValue = "Yleinen tie"
   }
 
   case object FerryRoad extends RoadType {
-    def value = 2;
+    def value = 2
 
     def displayValue = "Lauttaväylä yleisellä tiellä"
   }
 
   case object MunicipalityStreetRoad extends RoadType {
-    def value = 3;
+    def value = 3
 
     def displayValue = "Kunnan katuosuus"
   }
 
   case object PublicUnderConstructionRoad extends RoadType {
-    def value = 4;
+    def value = 4
 
     def displayValue = "Yleisen tien työmaa"
   }
 
   case object PrivateRoadType extends RoadType {
-    def value = 5;
+    def value = 5
 
     def displayValue = "Yksityistie"
   }
 
   case object UnknownOwnerRoad extends RoadType {
-    def value = 9;
+    def value = 9
 
     def displayValue = "Omistaja selvittämättä"
   }
 
   case object Unknown extends RoadType {
-    def value = 99;
+    def value = 99
 
     def displayValue = "Ei määritelty"
   }

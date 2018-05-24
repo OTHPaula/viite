@@ -251,25 +251,6 @@ class RoadAddressDAOSpec extends FunSuite with Matchers {
     }
   }
 
-  ignore("test if road addresses are expired") {
-    def now(): DateTime = {
-      OracleDatabase.withDynSession {
-        return sql"""select sysdate FROM dual""".as[DateTime].list.head
-      }
-    }
-
-    val beforeCallMethodDatetime = now()
-    runWithRollback {
-      val linkIds: Set[Long] = Set(4147081)
-      RoadAddressDAO.expireRoadAddresses(linkIds)
-      val dbResult = sql"""select valid_to FROM road_address where lrm_position_id in (select id from lrm_position where link_id in(4147081))""".as[DateTime].list
-      dbResult.size should be (1)
-      dbResult.foreach{ date =>
-        date.getMillis should be >= beforeCallMethodDatetime.getMillis
-      }
-    }
-  }
-
   test("find road address by start or end address value") {
     OracleDatabase.withDynSession {
       val s = RoadAddressDAO.fetchByAddressStart(75, 1, Track.apply(2), 875)

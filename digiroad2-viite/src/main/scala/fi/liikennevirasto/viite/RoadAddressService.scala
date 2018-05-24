@@ -10,6 +10,7 @@ import fi.liikennevirasto.digiroad2.oracle.OracleDatabase
 import fi.liikennevirasto.digiroad2.service.{RoadLinkService, RoadLinkType}
 import fi.liikennevirasto.digiroad2.user.User
 import fi.liikennevirasto.digiroad2.util.Track
+import fi.liikennevirasto.viite.RoadType.{MunicipalityStreetRoad, PrivateRoadType}
 import fi.liikennevirasto.viite.dao._
 import fi.liikennevirasto.viite.model.{Anomaly, RoadAddressLink, RoadAddressLinkLike}
 import fi.liikennevirasto.viite.process.RoadAddressFiller.{AddressChangeSet, LRMValueAdjustment}
@@ -58,14 +59,6 @@ class RoadAddressService(roadLinkService: RoadLinkService, eventbus: DigiroadEve
 
   class Contains(r: Range) {
     def unapply(i: Int): Boolean = r contains i
-  }
-
-  private def fetchRoadLinksWithComplementary(boundingRectangle: BoundingRectangle, roadNumberLimits: Seq[(Int, Int)], municipalities: Set[Int],
-                                              everything: Boolean = false, publicRoads: Boolean = false): (Seq[RoadLink], Seq[RoadLink]) = {
-    val roadLinksF = Future(roadLinkService.getRoadLinksFromVVH(boundingRectangle, roadNumberLimits, municipalities, everything, publicRoads, frozenTimeVVHAPIServiceEnabled))
-    val complementaryLinksF = Future(roadLinkService.getComplementaryRoadLinksFromVVH(boundingRectangle, municipalities))
-    val (roadLinks, complementaryLinks) = Await.result(roadLinksF.zip(complementaryLinksF), Duration.Inf)
-    (roadLinks, complementaryLinks)
   }
 
   private def fetchRoadAddressesByBoundingBox(boundingRectangle: BoundingRectangle, fetchOnlyFloating: Boolean = false,
@@ -211,7 +204,7 @@ class RoadAddressService(roadLinkService: RoadLinkService, eventbus: DigiroadEve
       val missed = missedRL.getOrElse(rl.linkId, Seq())
       rl.linkId -> buildRoadAddressLink(rl, ra, missed, floaters)
     }.toMap
-    val filteredSuravage = suravageLinks.filter(sl => suravageRA.contains(sl.linkId))
+    val filteredSuravage = suravageLinks.filter(sl => suravageRA.map(_.linkId).contains(sl.linkId))
     val mappedSuravage = filteredSuravage.map(sur => {
       val ra = suravageRA.filter(_.linkId == sur.linkId)
       sur.linkId -> buildSuravageRoadAddressLink(sur, ra)
@@ -264,8 +257,6 @@ class RoadAddressService(roadLinkService: RoadLinkService, eventbus: DigiroadEve
     val (filledTopology, changeSet) = RoadAddressFiller.fillTopology(roadLinks, viiteRoadLinks)
 
     publishChangeSet(changeSet)
-
-    val returningTopology = filledTopology.filterNot(p => p.anomaly == Anomaly.NoAddressGiven)
 
     setBlackUnderline(filledTopology ++ missingFloating)
 
@@ -416,7 +407,7 @@ class RoadAddressService(roadLinkService: RoadLinkService, eventbus: DigiroadEve
   }
 
   private def combineGeom(roadAddresses: Seq[RoadAddress]) = {
-    if (roadAddresses.length == 1) {
+    if (roadAddresses.lengthCompare(1) == 0) {
       roadAddresses.head
     } else {
       val max = roadAddresses.maxBy(ra => ra.endMValue)
@@ -560,7 +551,7 @@ class RoadAddressService(roadLinkService: RoadLinkService, eventbus: DigiroadEve
         case _ => NoClass
       }
     } catch {
-      case ex: NumberFormatException => NoClass
+      case _: NumberFormatException => NoClass
     }
   }
 
@@ -806,8 +797,7 @@ class RoadAddressService(roadLinkService: RoadLinkService, eventbus: DigiroadEve
 
   def transferFloatingToGap(sourceIds: Set[Long], targetIds: Set[Long], roadAddresses: Seq[RoadAddress], username: String): Unit = {
     val hasFloatings = withDynTransaction {
-      val currentRoadAddresses = RoadAddressDAO.fetchByLinkId(sourceIds, includeFloating = true, includeHistory = true,
-        includeTerminated = false)
+      val currentRoadAddresses = RoadAddressDAO.fetchByLinkId(sourceIds, includeFloating = true, includeTerminated = false)
       RoadAddressDAO.expireById(currentRoadAddresses.map(_.id).toSet)
       RoadAddressDAO.create(roadAddresses, Some(username))
       recalculateRoadAddresses(roadAddresses.head.roadNumber.toInt, roadAddresses.head.roadPartNumber.toInt)
@@ -836,8 +826,7 @@ class RoadAddressService(roadLinkService: RoadLinkService, eventbus: DigiroadEve
       )
     }
     val sourceRoadAddresses = withDynSession {
-      RoadAddressDAO.fetchByLinkId(sources.map(_.linkId).toSet, includeFloating = true,
-        includeHistory = true, includeTerminated = false)
+      RoadAddressDAO.fetchByLinkId(sources.map(_.linkId).toSet, includeFloating = true, includeTerminated = false)
     }
 
     val (currentSourceRoadAddresses, historySourceRoadAddresses) = sourceRoadAddresses.partition(ra => ra.endDate.isEmpty)
@@ -857,12 +846,11 @@ class RoadAddressService(roadLinkService: RoadLinkService, eventbus: DigiroadEve
 
   def recalculateRoadAddresses(roadNumber: Long, roadPartNumber: Long): Boolean = {
     try {
-      val roads = RoadAddressDAO.fetchByRoadPart(roadNumber, roadPartNumber, includeFloating = true,
-        includeExpired = false, includeHistory = false)
+      val roads = RoadAddressDAO.fetchByRoadPart(roadNumber, roadPartNumber, includeFloating = true)
       if (!roads.exists(_.floating)) {
         try {
           val adjusted = LinkRoadAddressCalculator.recalculate(roads)
-          assert(adjusted.size == roads.size)
+          assert(adjusted.lengthCompare(roads.size) == 0)
           // Must not lose any
           val (changed, unchanged) = adjusted.partition(ra =>
             roads.exists(oldra => ra.id == oldra.id && (oldra.startAddrMValue != ra.startAddrMValue || oldra.endAddrMValue != ra.endAddrMValue))
@@ -891,7 +879,7 @@ class RoadAddressService(roadLinkService: RoadLinkService, eventbus: DigiroadEve
       val newS =
         s"""old id: ${c.oldId.getOrElse("MISS!")} new id: ${c.newId.getOrElse("MISS!")} old length: ${setPrecision(c.oldStartMeasure.getOrElse(0.0))}-${setPrecision(c.oldEndMeasure.getOrElse(0.0))} new length: ${setPrecision(c.newStartMeasure.getOrElse(0.0))}-${setPrecision(c.newEndMeasure.getOrElse(0.0))} mml id: ${c.mmlId} vvhTimeStamp ${c.vvhTimeStamp}
      """
-      (s + "\n" + newS)
+      s + "\n" + newS
     }
 
     val groupedChanges = SortedMap(changes.groupBy(_.changeType).toSeq: _*)
@@ -900,7 +888,7 @@ class RoadAddressService(roadLinkService: RoadLinkService, eventbus: DigiroadEve
     }
   }
 
-  def getRoadNumbers(): Seq[Long] = {
+  def getRoadNumbers: Seq[Long] = {
     withDynSession {
       RoadAddressDAO.getRoadNumbers()
     }
@@ -932,7 +920,7 @@ class RoadAddressService(roadLinkService: RoadLinkService, eventbus: DigiroadEve
 
   def getRoadAddressByLinkIds(linkIds: Set[Long], withFloating: Boolean): Seq[RoadAddress] = {
     withDynSession {
-      RoadAddressDAO.fetchByLinkId(linkIds, withFloating, false, false)
+      RoadAddressDAO.fetchByLinkId(linkIds, withFloating, includeHistory = false, includeTerminated = false)
     }
   }
 
@@ -958,8 +946,8 @@ class RoadAddressService(roadLinkService: RoadLinkService, eventbus: DigiroadEve
 
   /**
     * This will define what road_addresses should have a black outline according to the following rule:
-    * Address must have road type = 3 (MunicipalityStreetRoad)
-    * The length of all addresses in the same road number and road part number that posses road type = 3  must be
+    * Address must have road type = 3 (MunicipalityStreetRoad) or road type = 5 (PrivateRoadType)
+    * The length of all addresses in the same road number and road part number that posses road type = 3 or road type = 5 must be
     * bigger than the combined length of ALL the road numbers that have the same road number and road part number divided by 2.
     *
     * @param addresses Sequence of all road addresses that were fetched
@@ -967,7 +955,7 @@ class RoadAddressService(roadLinkService: RoadLinkService, eventbus: DigiroadEve
     */
   private def setBlackUnderline(addresses: Seq[RoadAddressLink]): Seq[RoadAddressLink] = {
     logger.info("Starting the setting of the blackUnderline")
-    val (streetRoads, othersRoads) = addresses.partition(_.roadType == RoadType.MunicipalityStreetRoad)
+    val (streetRoads, othersRoads) = addresses.partition(address => address.roadType == MunicipalityStreetRoad || address.roadType == PrivateRoadType)
     streetRoads.map(_.copy(blackUnderline = true)) ++ othersRoads
   }
 }
