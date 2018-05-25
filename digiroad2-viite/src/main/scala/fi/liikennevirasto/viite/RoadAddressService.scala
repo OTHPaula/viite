@@ -60,10 +60,11 @@ class RoadAddressService(roadLinkService: RoadLinkService, eventbus: DigiroadEve
     def unapply(i: Int): Boolean = r contains i
   }
 
-  private def fetchRoadLinksWithComplementary(boundingRectangle: BoundingRectangle, roadNumberLimits: Seq[(Int, Int)], municipalities: Set[Int],
+  // TODO If not used, remove
+  private def fetchRoadLinksWithComplementary(boundingRectangle: BoundingRectangle, roadNumberLimits: Seq[(Int, Int)],
                                               everything: Boolean = false, publicRoads: Boolean = false): (Seq[RoadLink], Seq[RoadLink]) = {
-    val roadLinksF = Future(roadLinkService.getRoadLinksFromVVH(boundingRectangle, roadNumberLimits, municipalities, everything, publicRoads, frozenTimeVVHAPIServiceEnabled))
-    val complementaryLinksF = Future(roadLinkService.getComplementaryRoadLinksFromVVH(boundingRectangle, municipalities))
+    val roadLinksF = Future(roadLinkService.getRoadLinksFromVVH(boundingRectangle, roadNumberLimits, everything, publicRoads, frozenTimeVVHAPIServiceEnabled))
+    val complementaryLinksF = Future(roadLinkService.getComplementaryRoadLinksFromVVH(boundingRectangle))
     val (roadLinks, complementaryLinks) = Await.result(roadLinksF.zip(complementaryLinksF), Duration.Inf)
     (roadLinks, complementaryLinks)
   }
