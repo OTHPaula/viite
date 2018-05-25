@@ -109,17 +109,9 @@ class ViiteApi(val roadLinkService: RoadLinkService, val vVHClient: VVHClient,
 
   get("/roadlinks") {
     response.setHeader("Access-Control-Allow-Headers", "*")
-
-    val user = userProvider.getCurrentUser()
-    val municipalities: Set[Int] = if (user.isViiteUser()) Set() else user.configuration.authorizedMunicipalities
-
     val zoomLevel = chooseDrawType(params.getOrElse("zoom", "5"))
-    val day = params.get("dd")
-    val month = params.get("mm")
-    val year = params.get("yyyy")
-
     params.get("bbox")
-      .map(getRoadAddressLinks(municipalities, zoomLevel))
+      .map(getRoadAddressLinks(zoomLevel))
       .getOrElse(BadRequest("Missing mandatory 'bbox' parameter"))
   }
 
@@ -712,7 +704,7 @@ class ViiteApi(val roadLinkService: RoadLinkService, val vVHClient: VVHClient,
     (sources, targets)
   }
 
-  private def getRoadAddressLinks(municipalities: Set[Int], zoomLevel: Int)(bbox: String): Seq[Seq[Map[String, Any]]] = {
+  private def getRoadAddressLinks(zoomLevel: Int)(bbox: String): Seq[Seq[Map[String, Any]]] = {
     val boundingRectangle = constructBoundingRectangle(bbox)
     val startTime = System.currentTimeMillis()
     val viiteRoadLinks = zoomLevel match {
@@ -723,10 +715,10 @@ class ViiteApi(val roadLinkService: RoadLinkService, val vVHClient: VVHClient,
       case DrawRoadPartsOnly =>
         //        roadAddressService.getRoadParts(boundingRectangle, Seq((1, 19999)), municipalities)
         Seq()
-      case DrawLinearPublicRoads => roadAddressService.getRoadAddressesWithLinearGeometry(boundingRectangle, Seq((1, 19999), (40000, 49999)), municipalities)
-      case DrawPublicRoads => roadAddressService.getRoadAddressLinksByLinkId(boundingRectangle, Seq((1, 19999), (40000, 49999)), municipalities)
-      case DrawAllRoads => roadAddressService.getRoadAddressLinksWithSuravage(boundingRectangle, roadNumberLimits = Seq(), municipalities, everything = true)
-      case _ => roadAddressService.getRoadAddressLinksWithSuravage(boundingRectangle, roadNumberLimits = Seq((1, 19999)), municipalities)
+      case DrawLinearPublicRoads => roadAddressService.getRoadAddressesWithLinearGeometry(boundingRectangle, Seq((1, 19999), (40000, 49999)))
+      case DrawPublicRoads => roadAddressService.getRoadAddressLinksByLinkId(boundingRectangle, Seq((1, 19999), (40000, 49999)))
+      case DrawAllRoads => roadAddressService.getRoadAddressLinksWithSuravage(boundingRectangle, roadNumberLimits = Seq(), everything = true)
+      case _ => roadAddressService.getRoadAddressLinksWithSuravage(boundingRectangle, roadNumberLimits = Seq((1, 19999)))
     }
     logger.info(s"End fetching data from service (zoom level $zoomLevel) in ${(System.currentTimeMillis() - startTime) * 0.001}s")
     val partitionedRoadLinks = RoadAddressLinkPartitioner.partition(viiteRoadLinks)

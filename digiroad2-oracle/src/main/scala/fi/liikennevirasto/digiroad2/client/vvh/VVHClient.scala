@@ -460,8 +460,8 @@ trait VVHClientOperations {
   /**
     * Returns VVH road links in bounding box area. Municipalities are optional.
     */
-  protected def queryByMunicipalitiesAndBounds(bounds: BoundingRectangle, municipalities: Set[Int], filter: Option[String]): Seq[VVHType] = {
-    val definition = layerDefinition(combineFiltersWithAnd(withMunicipalityFilter(municipalities), filter))
+  protected def queryByMunicipalitiesAndBounds(bounds: BoundingRectangle, filter: Option[String]): Seq[VVHType] = {
+    val definition = layerDefinition(filter.getOrElse(""))
     val url = serviceUrl(bounds, definition, queryParameters())
 
     fetchVVHFeatures(url) match {
@@ -470,8 +470,8 @@ trait VVHClientOperations {
     }
   }
 
-  protected def queryByMunicipalitiesAndBounds(bounds: BoundingRectangle, municipalities: Set[Int]): Seq[VVHType] = {
-    queryByMunicipalitiesAndBounds(bounds, municipalities, None)
+  protected def queryByMunicipalitiesAndBounds(bounds: BoundingRectangle): Seq[VVHType] = {
+    queryByMunicipalitiesAndBounds(bounds, None)
   }
 
   /**
@@ -535,12 +535,12 @@ class VVHRoadLinkClient(vvhRestApiEndPoint: String) extends VVHClientOperations{
     * Returns VVH road links in bounding box area. Municipalities are optional.
     * Used by VVHClient.fetchByRoadNumbersBoundsAndMunicipalitiesF.
     */
-  protected def queryByMunicipalitiesAndBounds(bounds: BoundingRectangle, roadNumbers: Seq[(Int, Int)], municipalities: Set[Int] = Set(), includeAllPublicRoads: Boolean = false): Seq[VVHRoadlink] = {
+  protected def queryByMunicipalitiesAndBounds(bounds: BoundingRectangle, roadNumbers: Seq[(Int, Int)], includeAllPublicRoads: Boolean = false): Seq[VVHRoadlink] = {
     val roadNumberFilters = if (roadNumbers.nonEmpty || includeAllPublicRoads)
       Some(withRoadNumbersFilter(roadNumbers, includeAllPublicRoads))
     else
       None
-    queryByMunicipalitiesAndBounds(bounds, municipalities, roadNumberFilters)
+    queryByMunicipalitiesAndBounds(bounds, roadNumberFilters)
   }
 
   /**
@@ -837,8 +837,8 @@ class VVHRoadLinkClient(vvhRestApiEndPoint: String) extends VVHClientOperations{
     * Used by RoadLinkService.getRoadLinksAndChangesFromVVH(bounds, municipalities),
     * RoadLinkService.getViiteRoadLinksAndChangesFromVVH(bounds, roadNumbers, municipalities, everything, publicRoads).
     */
-  def fetchByMunicipalitiesAndBoundsF(bounds: BoundingRectangle, municipalities: Set[Int]): Future[Seq[VVHRoadlink]] = {
-    Future(queryByMunicipalitiesAndBounds(bounds, municipalities))
+  def fetchByMunicipalitiesAndBoundsF(bounds: BoundingRectangle): Future[Seq[VVHRoadlink]] = {
+    Future(queryByMunicipalitiesAndBounds(bounds))
   }
 
   def fetchByPolygon(polygon : Polygon): Seq[VVHRoadlink] = {
@@ -857,9 +857,9 @@ class VVHRoadLinkClient(vvhRestApiEndPoint: String) extends VVHClientOperations{
     * Returns VVH road links. Uses Scala Future for concurrent operations.
     * Used by RoadLinkService.getRoadLinksAndChangesFromVVH(bounds, municipalities).
     */
-  def fetchByRoadNumbersBoundsAndMunicipalitiesF(bounds: BoundingRectangle, municipalities: Set[Int], roadNumbers: Seq[(Int, Int)],
+  def fetchByRoadNumbersBoundsAndMunicipalitiesF(bounds: BoundingRectangle, roadNumbers: Seq[(Int, Int)],
                                                  includeAllPublicRoads: Boolean = false): Future[Seq[VVHRoadlink]] = {
-    Future(queryByMunicipalitiesAndBounds(bounds, roadNumbers, municipalities, includeAllPublicRoads))
+    Future(queryByMunicipalitiesAndBounds(bounds, roadNumbers, includeAllPublicRoads))
   }
 
   /**
@@ -929,8 +929,8 @@ class VVHChangeInfoClient(vvhRestApiEndPoint: String) extends VVHClientOperation
     queryByMunicipality(municipality)
   }
 
-  def fetchByBoundsAndMunicipalitiesF(bounds: BoundingRectangle, municipalities: Set[Int]): Future[Seq[ChangeInfo]] = {
-    Future(queryByMunicipalitiesAndBounds(bounds, municipalities))
+  def fetchByBoundsAndMunicipalitiesF(bounds: BoundingRectangle): Future[Seq[ChangeInfo]] = {
+    Future(queryByMunicipalitiesAndBounds(bounds))
   }
 
   def fetchByMunicipalityF(municipality: Int): Future[Seq[ChangeInfo]] = {
@@ -1169,8 +1169,8 @@ class VVHSuravageClient(vvhRestApiEndPoint: String) extends VVHRoadLinkClient(vv
     "LINKID,OBJECTID,MTKHEREFLIP,MUNICIPALITYCODE,VERTICALLEVEL,HORIZONTALACCURACY,VERTICALACCURACY,MTKCLASS,ADMINCLASS,DIRECTIONTYPE,ROADNAME_FI,ROADNAME_SM,ROADNAME_SE,FROM_LEFT,TO_LEFT,FROM_RIGHT,TO_RIGHT,LAST_EDITED_DATE,ROADNUMBER,ROADPARTNUMBER,VALIDFROM,GEOMETRY_EDITED_DATE,CREATED_DATE,SURFACETYPE,SUBTYPE,CONSTRUCTIONTYPE,CUST_OWNER,GEOMETRYLENGTH,TRACK_CODE"
   }
 
-  def fetchSuravageByMunicipalitiesAndBoundsF(bounds: BoundingRectangle, municipalities: Set[Int]): Future[Seq[VVHRoadlink]] = {
-    Future(queryByMunicipalitiesAndBounds(bounds, municipalities, None))
+  def fetchSuravageByMunicipalitiesAndBoundsF(bounds: BoundingRectangle): Future[Seq[VVHRoadlink]] = {
+    Future(queryByMunicipalitiesAndBounds(bounds, None))
   }
 
   def fetchSuravageByLinkIdsF(linkIds: Set[Long] = Set()): Future[Seq[VVHRoadlink]] = {

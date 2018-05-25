@@ -96,7 +96,7 @@ class RoadAddressService(roadLinkService: RoadLinkService, eventbus: DigiroadEve
     })
   }
 
-  def getSuravageRoadLinkAddresses(boundingRectangle: BoundingRectangle, municipalities: Set[Int],
+  def getSuravageRoadLinkAddresses(boundingRectangle: BoundingRectangle,
                                    boundingBoxResult: BoundingBoxResult): Seq[RoadAddressLink] = {
     withDynSession {
       Await.result(boundingBoxResult.suravageF, Duration.Inf).map(x => (x, None)).map(RoadAddressLinkBuilder.buildSuravageRoadAddressLink)
@@ -110,22 +110,22 @@ class RoadAddressService(roadLinkService: RoadLinkService, eventbus: DigiroadEve
     }
   }
 
-  def fetchBoundingBoxF(boundingRectangle: BoundingRectangle, roadNumberLimits: Seq[(Int, Int)], municipalities: Set[Int],
+  def fetchBoundingBoxF(boundingRectangle: BoundingRectangle, roadNumberLimits: Seq[(Int, Int)],
                         everything: Boolean = false, publicRoads: Boolean = false): BoundingBoxResult = {
     BoundingBoxResult(
-      roadLinkService.getChangeInfoFromVVHF(boundingRectangle, municipalities),
+      roadLinkService.getChangeInfoFromVVHF(boundingRectangle),
       Future(fetchRoadAddressesByBoundingBox(boundingRectangle)),
-      Future(roadLinkService.getRoadLinksFromVVH(boundingRectangle, roadNumberLimits, municipalities, everything, publicRoads, frozenTimeVVHAPIServiceEnabled)),
-      Future(roadLinkService.getComplementaryRoadLinksFromVVH(boundingRectangle, municipalities)),
-      roadLinkService.getSuravageLinksFromVVHF(boundingRectangle, municipalities)
+      Future(roadLinkService.getRoadLinksFromVVH(boundingRectangle, roadNumberLimits, everything, publicRoads, frozenTimeVVHAPIServiceEnabled)),
+      Future(roadLinkService.getComplementaryRoadLinksFromVVH(boundingRectangle)),
+      roadLinkService.getSuravageLinksFromVVHF(boundingRectangle)
     )
   }
 
-  def getRoadAddressLinksWithSuravage(boundingRectangle: BoundingRectangle, roadNumberLimits: Seq[(Int, Int)], municipalities: Set[Int],
+  def getRoadAddressLinksWithSuravage(boundingRectangle: BoundingRectangle, roadNumberLimits: Seq[(Int, Int)],
                                       everything: Boolean = false, publicRoads: Boolean = false): Seq[RoadAddressLink] = {
-    val combinedFuture = fetchBoundingBoxF(boundingRectangle, roadNumberLimits, municipalities, everything, publicRoads)
-    val roadAddressLinks = getRoadAddressLinks(combinedFuture, boundingRectangle, Seq(), municipalities, everything)
-    val suravageAddresses = getSuravageRoadLinkAddresses(boundingRectangle, municipalities, combinedFuture)
+    val combinedFuture = fetchBoundingBoxF(boundingRectangle, roadNumberLimits, everything, publicRoads)
+    val roadAddressLinks = getRoadAddressLinks(combinedFuture, boundingRectangle, Seq(), everything)
+    val suravageAddresses = getSuravageRoadLinkAddresses(boundingRectangle, combinedFuture)
     setBlackUnderline(suravageAddresses ++ roadAddressLinks)
   }
 
@@ -137,7 +137,7 @@ class RoadAddressService(roadLinkService: RoadLinkService, eventbus: DigiroadEve
   }
 
   def getRoadAddressLinks(boundingBoxResult: BoundingBoxResult,
-                          boundingRectangle: BoundingRectangle, roadNumberLimits: Seq[(Int, Int)], municipalities: Set[Int],
+                          boundingRectangle: BoundingRectangle, roadNumberLimits: Seq[(Int, Int)],
                           everything: Boolean = false, publicRoads: Boolean = false): Seq[RoadAddressLink] = {
     def complementaryLinkFilter(roadAddressLink: RoadAddressLink) = {
       everything || publicRoads || roadNumberLimits.exists {
@@ -221,7 +221,7 @@ class RoadAddressService(roadLinkService: RoadLinkService, eventbus: DigiroadEve
     mappedRegular ++ mappedSuravage
   }
 
-  def getRoadAddressLinksByLinkId(boundingRectangle: BoundingRectangle, roadNumberLimits: Seq[(Int, Int)], municipalities: Set[Int]): Seq[RoadAddressLink] = {
+  def getRoadAddressLinksByLinkId(boundingRectangle: BoundingRectangle, roadNumberLimits: Seq[(Int, Int)]): Seq[RoadAddressLink] = {
 
     val fetchAddrStartTime = System.currentTimeMillis()
     val fetchRoadAddressesByBoundingBoxF = Future(fetchRoadAddressesByBoundingBox(boundingRectangle, fetchOnlyFloating = false, onlyNormalRoads = true, roadNumberLimits))
@@ -271,7 +271,7 @@ class RoadAddressService(roadLinkService: RoadLinkService, eventbus: DigiroadEve
 
   }
 
-  def getRoadAddressesWithLinearGeometry(boundingRectangle: BoundingRectangle, roadNumberLimits: Seq[(Int, Int)], municipalities: Set[Int]): Seq[RoadAddressLink] = {
+  def getRoadAddressesWithLinearGeometry(boundingRectangle: BoundingRectangle, roadNumberLimits: Seq[(Int, Int)]): Seq[RoadAddressLink] = {
 
     val fetchRoadAddressesByBoundingBoxF = Future(fetchRoadAddressesByBoundingBox(boundingRectangle, fetchOnlyFloating = false, onlyNormalRoads = true, roadNumberLimits))
 
