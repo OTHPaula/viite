@@ -136,6 +136,8 @@ class RoadAddressService(roadLinkService: RoadLinkService, eventbus: DigiroadEve
     t
   }
 
+
+  // TODO This method tries to do too many things, it should be broken into multiple methods
   def getRoadAddressLinks(boundingBoxResult: BoundingBoxResult,
                           boundingRectangle: BoundingRectangle, roadNumberLimits: Seq[(Int, Int)], municipalities: Set[Int],
                           everything: Boolean = false, publicRoads: Boolean = false): Seq[RoadAddressLink] = {
@@ -187,7 +189,7 @@ class RoadAddressService(roadLinkService: RoadLinkService, eventbus: DigiroadEve
     val returningTopology = filledTopology.filter(link => !complementaryLinkIds.contains(link.linkId) ||
       complementaryLinkFilter(link))
 
-    returningTopology ++ missingFloating.map(floating => floating.copy(roadLinkType = RoadLinkType.FloatingRoadLinkType))
+    returningTopology.map(x=>if ( floating.map(_.linkId).contains(x.linkId) ) x.copy(roadLinkType=RoadLinkType.FloatingRoadLinkType   ) else x.copy()) ++ missingFloating.map(floating => floating.copy(roadLinkType = RoadLinkType.FloatingRoadLinkType))
 
   }
 
