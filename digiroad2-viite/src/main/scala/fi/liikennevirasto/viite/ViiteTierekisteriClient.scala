@@ -190,6 +190,7 @@ object ViiteTierekisteriClient {
 
   private def convertChangeDataToChangeProject(changeData: ProjectRoadAddressChange): ChangeProject = {
     val changeInfo = changeData.changeInfo
+    logger.info(s"""Convert change data to change project ${changeData.projectId}""")
     ChangeProject(changeData.rotatingTRId.getOrElse(nullRotatingTRProjectId), changeData.projectName.getOrElse(""), changeData.user, changeData.ely,
       DateTimeFormat.forPattern("yyyy-MM-dd").print(changeData.projectStartDate), Seq(changeInfo))
   }
@@ -214,6 +215,7 @@ object ViiteTierekisteriClient {
 
   def sendJsonMessage(trProject:ChangeProject): ProjectChangeStatus ={
     implicit val formats = DefaultFormats
+    logger.info(s"""Start sending project to tr ${trProject.id}""")
     val request = new HttpPost(getRestEndPoint+"addresschange/")
     request.addHeader("X-Authorization", "Basic " + auth.getAuthInBase64)
     request.setEntity(createJsonMessage(trProject))

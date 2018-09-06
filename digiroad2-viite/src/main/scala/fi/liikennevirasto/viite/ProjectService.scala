@@ -1388,8 +1388,9 @@ class ProjectService(roadAddressService: RoadAddressService, roadLinkService: Ro
           ProjectDAO.updateProjectStatus(projectId, SendingToTR)
           PublishResult(validationSuccess = false, sendSuccess = false, Some(trUnreachableMessage))
         }
-        case NonFatal(_) => {
+        case NonFatal(e) => {
           ProjectDAO.updateProjectStatus(projectId, ErrorInViite)
+          logger.error(s"""Error publishing project to Tierekisteri with message ${e.getMessage}""")
           PublishResult(validationSuccess = false, sendSuccess = false, Some(genericViiteErrorMessage))
         }
       }
