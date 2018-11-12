@@ -10,7 +10,6 @@ import fi.liikennevirasto.digiroad2.util.LogUtils.time
 import fi.liikennevirasto.digiroad2.{GeometryUtils, Point}
 import fi.liikennevirasto.viite._
 import fi.liikennevirasto.viite.dao.CalibrationPointSource.{ProjectLinkSource, RoadAddressSource}
-import fi.liikennevirasto.viite.dao.FloatingReason.NoFloating
 import fi.liikennevirasto.viite.process.RoadAddressFiller.LinearLocationAdjustment
 import org.joda.time.DateTime
 import org.joda.time.format.{DateTimeFormatter, ISODateTimeFormat}
@@ -19,6 +18,7 @@ import slick.driver.JdbcDriver.backend.Database.dynamicSession
 import slick.jdbc.StaticQuery.interpolation
 import slick.jdbc.{GetResult, PositionedResult, StaticQuery => Q}
 
+/*
 sealed trait FloatingReason {
   def value: Int
 
@@ -64,7 +64,7 @@ object FloatingReason {
     def value = 7
   }
 
-}
+}*/
 
 trait BaseLinearLocation {
   def id: Long
@@ -83,7 +83,7 @@ trait BaseLinearLocation {
 
   def calibrationPoints: (Option[Long], Option[Long])
 
-  def floating: FloatingReason
+//  def floating: FloatingReason
 
   def geometry: Seq[Point]
 
@@ -95,7 +95,7 @@ trait BaseLinearLocation {
 
   def validTo: Option[DateTime]
 
-  def isFloating: Boolean = floating.isFloating
+//  def isFloating: Boolean = floating.isFloating
 
   def copyWithGeometry(newGeometry: Seq[Point]): BaseLinearLocation
 
@@ -134,7 +134,7 @@ trait BaseLinearLocation {
 // Note: Geometry on linear location is not directed: it isn't guaranteed to have a direction of digitization or road addressing
 case class LinearLocation(id: Long, orderNumber: Long, linkId: Long, startMValue: Double, endMValue: Double, sideCode: SideCode,
                           adjustedTimestamp: Long, calibrationPoints: (Option[Long], Option[Long]) = (None, None),
-                          floating: FloatingReason = NoFloating, geometry: Seq[Point], linkGeomSource: LinkGeomSource,
+                          /*floating: FloatingReason = NoFloating,*/ geometry: Seq[Point], linkGeomSource: LinkGeomSource,
                           roadwayNumber: Long, validFrom: Option[DateTime] = None, validTo: Option[DateTime] = None) extends BaseLinearLocation {
 
   val startCalibrationPoint: Option[Long] = calibrationPoints._1
@@ -164,11 +164,11 @@ class LinearLocationDAO {
   }
 
   val dateFormatter: DateTimeFormatter = ISODateTimeFormat.basicDate()
-
+  //TODO commented code due to removal of floating stories 1537 & 1538
   val selectFromLinearLocation =
     """
     select loc.id, loc.ROADWAY_NUMBER, loc.order_number, loc.link_id, loc.start_measure, loc.end_measure, loc.SIDE,
-      loc.cal_start_addr_m, loc.cal_end_addr_m, loc.link_source, loc.adjusted_timestamp, loc.floating, t.X, t.Y, t2.X, t2.Y,
+      loc.cal_start_addr_m, loc.cal_end_addr_m, loc.link_source, loc.adjusted_timestamp, t.X, t.Y, t2.X, t2.Y,
       loc.valid_from, loc.valid_to
     from LINEAR_LOCATION loc cross join
       TABLE(SDO_UTIL.GETVERTICES(loc.geometry)) t cross join
@@ -191,10 +191,11 @@ class LinearLocationDAO {
     Queries.nextLinearLocationId.as[Long].first
   }
 
+  //TODO commented code due to removal of floating stories 1537 & 1538
   def create(linearLocations: Iterable[LinearLocation], createdBy: String = "-"): Seq[Long] = {
     val ps = dynamicSession.prepareStatement(
       """insert into LINEAR_LOCATION (id, ROADWAY_NUMBER, order_number, link_id, start_measure, end_measure, SIDE,
-        cal_start_addr_m, cal_end_addr_m, link_source, adjusted_timestamp, floating, geometry, created_by)
+        cal_start_addr_m, cal_end_addr_m, link_source, adjusted_timestamp, geometry, created_by)
         values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
         MDSYS.SDO_GEOMETRY(4002, 3067, NULL, MDSYS.SDO_ELEM_INFO_ARRAY(1,2,1), MDSYS.SDO_ORDINATE_ARRAY(?,?,0.0,?,?,?,0.0,?)), ?)""")
 
@@ -229,15 +230,15 @@ class LinearLocationDAO {
         }
         ps.setInt(10, location.linkGeomSource.value)
         ps.setLong(11, location.adjustedTimestamp)
-        ps.setInt(12, location.floating.value)
+//        ps.setInt(12, location.floating.value)
         val (p1, p2) = (location.geometry.head, location.geometry.last)
-        ps.setDouble(13, p1.x)
-        ps.setDouble(14, p1.y)
-        ps.setDouble(15, location.startMValue)
-        ps.setDouble(16, p2.x)
-        ps.setDouble(17, p2.y)
-        ps.setDouble(18, location.endMValue)
-        ps.setString(19, if (createdBy == null) "-" else createdBy)
+        ps.setDouble(12, p1.x)
+        ps.setDouble(13, p1.y)
+        ps.setDouble(14, location.startMValue)
+        ps.setDouble(15, p2.x)
+        ps.setDouble(16, p2.y)
+        ps.setDouble(17, location.endMValue)
+        ps.setString(18, if (createdBy == null) "-" else createdBy)
         ps.addBatch()
     }
     ps.executeBatch()
@@ -262,7 +263,7 @@ class LinearLocationDAO {
       val calEndM = r.nextLongOption()
       val linkSource = r.nextInt()
       val adjustedTimestamp = r.nextLong()
-      val floating = r.nextInt()
+//      val floating = r.nextInt()
       val x1 = r.nextDouble()
       val y1 = r.nextDouble()
       val x2 = r.nextDouble()
@@ -271,7 +272,7 @@ class LinearLocationDAO {
       val validTo = r.nextDateOption.map(d => formatter.parseDateTime(d.toString))
 
       LinearLocation(id, orderNumber, linkId, startMeasure, endMeasure, SideCode.apply(sideCode), adjustedTimestamp,
-        (calStartM, calEndM), FloatingReason.apply(floating), Seq(Point(x1, y1), Point(x2, y2)),
+        (calStartM, calEndM), Seq(Point(x1, y1), Point(x2, y2)),
         LinkGeomSource.apply(linkSource), roadwayNumber, validFrom, validTo)
     }
   }
@@ -326,15 +327,16 @@ class LinearLocationDAO {
     }
   }
 
-  def fetchByIdMassQuery(ids: Set[Long], includeFloating: Boolean = false, rejectInvalids: Boolean = true): List[LinearLocation] = {
+  //TODO commented code due to removal of floating stories 1537 & 1538
+  def fetchByIdMassQuery(ids: Set[Long], rejectInvalids: Boolean = true): List[LinearLocation] = {
     time(logger, "Fetch linear locations by id - mass query") {
       MassQuery.withIds(ids) {
         idTableName =>
 
-          val floating = if (!includeFloating)
-            "AND loc.floating = 0"
-          else
-            ""
+//          val floating = if (!includeFloating)
+//            "AND loc.floating = 0"
+//          else
+//            ""
 
           val validToFilter = if (rejectInvalids)
             " and loc.valid_to is null"
@@ -345,7 +347,7 @@ class LinearLocationDAO {
             s"""
               $selectFromLinearLocation
               join $idTableName i on i.id = loc.id
-              where t.id < t2.id $floating $validToFilter
+              where t.id < t2.id $validToFilter
             """
           queryList(query)
       }
@@ -353,22 +355,22 @@ class LinearLocationDAO {
   }
 
   def queryByIdMassQuery(ids: Set[Long], rejectInvalids: Boolean = true): List[LinearLocation] = {
-    fetchByIdMassQuery(ids, includeFloating = true, rejectInvalids)
+    fetchByIdMassQuery(ids, rejectInvalids)
   }
 
-  def fetchByLinkId(linkIds: Set[Long], includeFloating: Boolean = false, filterIds: Set[Long] = Set()): List[LinearLocation] = {
+  def fetchByLinkId(linkIds: Set[Long], filterIds: Set[Long] = Set()): List[LinearLocation] = {
     time(logger, "Fetch linear locations by link id") {
       if (linkIds.isEmpty) {
         return List()
       }
       if (linkIds.size > 1000 || filterIds.size > 1000) {
-        return fetchByLinkIdMassQuery(linkIds, includeFloating).filterNot(ra => filterIds.contains(ra.id))
+        return fetchByLinkIdMassQuery(linkIds).filterNot(ra => filterIds.contains(ra.id))
       }
       val linkIdsString = linkIds.mkString(", ")
-      val floating = if (!includeFloating)
-        "AND loc.floating = 0"
-      else
-        ""
+//      val floating = if (!includeFloating)
+//        "AND loc.floating = 0"
+//      else
+//        ""
       val idFilter = if (filterIds.nonEmpty)
         s"AND loc.id not in ${filterIds.mkString("(", ", ", ")")}"
       else
@@ -376,25 +378,25 @@ class LinearLocationDAO {
       val query =
         s"""
           $selectFromLinearLocation
-          where loc.link_id in ($linkIdsString) $floating $idFilter and t.id < t2.id and loc.valid_to is null
+          where loc.link_id in ($linkIdsString) $idFilter and t.id < t2.id and loc.valid_to is null
         """
       queryList(query)
     }
   }
 
-  def fetchByLinkIdMassQuery(linkIds: Set[Long], includeFloating: Boolean = false): List[LinearLocation] = {
+  def fetchByLinkIdMassQuery(linkIds: Set[Long]): List[LinearLocation] = {
     time(logger, "Fetch linear locations by link id - mass query") {
       MassQuery.withIds(linkIds) {
         idTableName =>
-          val floating = if (!includeFloating)
-            "AND loc.floating = 0"
-          else
-            ""
+//          val floating = if (!includeFloating)
+//            "AND loc.floating = 0"
+//          else
+//            ""
           val query =
             s"""
               $selectFromLinearLocation
               join $idTableName i on i.id = loc.link_id
-              where t.id < t2.id $floating and loc.valid_to is null
+              where t.id < t2.id and loc.valid_to is null
             """
           queryList(query)
       }
@@ -438,7 +440,7 @@ class LinearLocationDAO {
     }
   }
 
-  def queryFloatingByLinkId(linkIds: Set[Long]): List[LinearLocation] = {
+  /*def queryFloatingByLinkId(linkIds: Set[Long]): List[LinearLocation] = {
     time(logger, "Fetch floating linear locations by link ids") {
       if (linkIds.isEmpty) {
         return List()
@@ -455,9 +457,9 @@ class LinearLocationDAO {
         """
       queryList(query)
     }
-  }
+  }*/
 
-  def queryFloatingByLinkIdMassQuery(linkIds: Set[Long]): List[LinearLocation] = {
+  /*def queryFloatingByLinkIdMassQuery(linkIds: Set[Long]): List[LinearLocation] = {
     time(logger, "Fetch floating linear locations by link ids - mass query") {
       MassQuery.withIds(linkIds) {
         idTableName =>
@@ -470,9 +472,9 @@ class LinearLocationDAO {
           queryList(query)
       }
     }
-  }
+  }*/
 
-  def fetchAllFloatingLinearLocations: List[LinearLocation] = {
+  /*def fetchAllFloatingLinearLocations: List[LinearLocation] = {
     time(logger, "Fetch all floating linear locations") {
       val query =
         s"""
@@ -482,7 +484,7 @@ class LinearLocationDAO {
         """
       queryList(query)
     }
-  }
+  }*/
 
   // TODO If not used, should be removed
   def toTimeStamp(dateTime: Option[DateTime]): Option[Timestamp] = {
@@ -527,7 +529,7 @@ class LinearLocationDAO {
       Q.updateNA(query).first
   }
 
-  def updateToFloating(id: Long, geometry: Option[Seq[Point]], floatingReason: FloatingReason,
+  /*def updateToFloating(id: Long, geometry: Option[Seq[Point]], floatingReason: FloatingReason,
                        createdBy: String = "setLinearLocationFloatingReason"): Unit = {
 
     // Expire old row
@@ -542,7 +544,7 @@ class LinearLocationDAO {
       expired.copy(id = NewLinearLocation, floating = floatingReason)
     }), createdBy)
 
-  }
+  }*/
 
   def update(adjustment: LinearLocationAdjustment,
              createdBy: String = "updateLinearLocation"): Unit = {
@@ -641,8 +643,9 @@ class LinearLocationDAO {
       case Some(e) => s" AND loc.end_Measure >= $endM"
       case None => ""
     }
-
-    query + s" WHERE loc.link_id = $linkId $startFilter $endFilter AND floating = 0" + withValidityCheck
+    //TODO commented code due to removal of floating stories 1537 & 1538
+//    query + s" WHERE loc.link_id = $linkId $startFilter $endFilter AND floating = 0" + withValidityCheck
+    query + s" WHERE loc.link_id = $linkId $startFilter $endFilter " + withValidityCheck
   }
 
   def withRoadwayNumbers(fromRoadwayNumber: Long, toRoadwayNumber: Long)(query: String): String = {
