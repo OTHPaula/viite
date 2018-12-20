@@ -31,7 +31,11 @@ object RoadwayFiller {
     val changeSource = change.changeInfo.source
     val changeTarget = change.changeInfo.target
     currentRoadways.map { currentRoadway =>
-      val projectLinksInRoadway = projectLinks.filter(_.roadwayId == currentRoadway.id).sortBy(_.startAddrMValue)
+      val projectLinksInRoadway = projectLinks
+        .filter(projectLink => projectLink.roadwayId == currentRoadway.id
+          && projectLink.roadNumber == changeTarget.roadNumber.get
+          && projectLink.roadPartNumber == changeTarget.startRoadPartNumber.get)
+        .sortBy(_.startAddrMValue)
       val roadTypeAndDiscontinuityChanged = currentRoadway.roadType == changeTarget.roadType.get && currentRoadway.discontinuity == changeTarget.discontinuity.get
       val lengthUnchanged = currentRoadway.startAddrMValue == projectLinksInRoadway.head.startAddrMValue && currentRoadway.endAddrMValue == projectLinksInRoadway.last.endAddrMValue
       val roadways = {
